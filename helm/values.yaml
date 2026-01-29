@@ -20,10 +20,10 @@ nameOverride: ""
 fullnameOverride: ""
 
 configManagement:
-  offlineMode: false
+  offlineMode: true
   name: 'service-name'
   version: 'latest'
-  serverUrl: 'http://localhost:8080/api'
+  serverUrl: 'http://config-service-config-server-service:8080/api'
 
 livenessProbe:
   enabled: true
@@ -45,7 +45,26 @@ extraVolumes: []
 
 extraVolumeMounts: []
 
-extraEnvVars: []
+extraEnvVars: 
+  - name: DB_HOST
+    value: postgresql-postgis
+  - name: DB_PORT
+    value: "5432"
+  - name: DB_USER
+    valueFrom:
+      secretKeyRef:
+        name: postgresql-secret
+        key: POSTGRES_USER
+  - name: DB_PASSWORD
+    valueFrom:
+      secretKeyRef:
+        name: postgresql-secret
+        key: POSTGRES_PASSWORD
+  - name: DB_NAME
+    valueFrom:
+      secretKeyRef:
+        name: postgresql-secret
+        key: POSTGRES_DB
 
 command: []
 args: []
@@ -55,8 +74,8 @@ args: []
 sidecars: []
 
 cloudProvider:
-  dockerRegistryUrl: ''
-  imagePullSecretName: ''
+  dockerRegistryUrl: 'acrarolibotnonprod.azurecr.io'
+  imagePullSecretName: 'acr-secret'
   flavor: openshift
 
 caSecretName: ''
@@ -64,9 +83,9 @@ caPath: '/usr/local/share/ca-certificates'
 caKey: 'ca.crt'
 
 image:
-  repository: ts-server-boilerplate
+  repository: products-catalog
   # If commented, appVersion will be taken. See: _helpers.tpl
-  # tag: 'latest'
+  tag: '1.0'
   pullPolicy: IfNotPresent
 
 env:
