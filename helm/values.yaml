@@ -45,26 +45,7 @@ extraVolumes: []
 
 extraVolumeMounts: []
 
-extraEnvVars: 
-  - name: DB_HOST
-    value: postgresql-postgis
-  - name: DB_PORT
-    value: "5432"
-  - name: DB_USER
-    valueFrom:
-      secretKeyRef:
-        name: postgresql-secret
-        key: POSTGRES_USER
-  - name: DB_PASSWORD
-    valueFrom:
-      secretKeyRef:
-        name: postgresql-secret
-        key: POSTGRES_PASSWORD
-  - name: DB_NAME
-    valueFrom:
-      secretKeyRef:
-        name: postgresql-secret
-        key: POSTGRES_DB
+extraEnvVars: []
 
 command: []
 args: []
@@ -74,7 +55,6 @@ args: []
 sidecars: []
 
 cloudProvider:
-  dockerRegistryUrl: 'acrarolibotnonprod.azurecr.io'
   imagePullSecretName: 'acr-secret'
   flavor: openshift
 
@@ -96,12 +76,22 @@ env:
   logPrettyPrintEnabled: false
   responseCompressionEnabled: true
   requestPayloadLimit: 1mb
+  db:
+    host: postgresql-postgis
+    port: 5432
+    name: product_catalog
   tracing:
     enabled: false
     url: http://localhost:55681/v1/trace
   metrics:
     enabled: false
     url: http://localhost:55681/v1/metrics
+
+db:
+  authentication:
+    existingSecret: "postgresql-secret"
+    userKey: "POSTGRES_USER"
+    passwordKey: "POSTGRES_PASSWORD"
 
 resources:
   enabled: true

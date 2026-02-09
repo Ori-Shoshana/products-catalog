@@ -1,16 +1,38 @@
-import { StatusCodes } from 'http-status-codes';
+import httpStatus from 'http-status-codes';
+import { HttpError } from '@map-colonies/error-express-handler';
 
-export class HttpError extends Error {
-  public constructor(
-    public readonly status: number,
-    message: string,
-    public override readonly cause?: unknown
-  ) {
+export class BadRequestError extends Error implements HttpError {
+  public readonly status = httpStatus.BAD_REQUEST;
+
+  public constructor(message: string) {
     super(message);
-    this.name = 'HttpError';
+    this.name = 'BadRequestError';
   }
 }
 
-export const badRequest = (message: string, cause?: unknown): HttpError => new HttpError(StatusCodes.BAD_REQUEST, message, cause);
-export const notFound = (message: string, cause?: unknown): HttpError => new HttpError(StatusCodes.NOT_FOUND, message, cause);
-export const internalServerError = (message: string, cause?: unknown): HttpError => new HttpError(StatusCodes.INTERNAL_SERVER_ERROR, message, cause);
+export class InternalServerError extends Error implements HttpError {
+  public readonly status = httpStatus.INTERNAL_SERVER_ERROR;
+
+  public constructor(message: string) {
+    super(message);
+    this.name = 'InternalServerError';
+  }
+}
+
+export class NotFoundError extends Error implements HttpError {
+  public readonly status = httpStatus.NOT_FOUND;
+
+  public constructor(message: string) {
+    super(message);
+    this.name = 'NotFoundError';
+  }
+}
+
+export class ServiceUnavailableError extends Error implements HttpError {
+  public readonly status = httpStatus.SERVICE_UNAVAILABLE;
+
+  public constructor(message: string) {
+    super(message);
+    this.name = 'ServiceUnavailableError';
+  }
+}

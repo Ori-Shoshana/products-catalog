@@ -3,6 +3,7 @@ import httpStatus from 'http-status-codes';
 import { injectable, inject } from 'tsyringe';
 import { type Registry, Counter } from 'prom-client';
 import type { Logger } from '@map-colonies/js-logger';
+import { BadRequestError } from '@src/common/errors';
 import { SERVICES } from '@common/constants';
 import { ProductManager } from '../models/productManager';
 import type { ProductCreateInput, ProductUpdateInput, ProductQueryFilters } from '../models/product';
@@ -89,14 +90,8 @@ export class ProductController {
   };
   private parseId(idParam: string): number {
     const trimmed = idParam.trim();
-    if (!/^\d+$/.test(trimmed)) {
-      throw new Error('Invalid id FROM PARSEID');
-    }
-
     const id = Number(trimmed);
-    if (!Number.isSafeInteger(id) || id <= 0) {
-      throw new Error('Invalid id FROM PARSEID');
-    }
+    if (!Number.isSafeInteger(id) || id <= 0) throw new BadRequestError(`Invalid product ID: ${idParam}`);
     return id;
   }
 }

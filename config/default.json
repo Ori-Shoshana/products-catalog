@@ -22,12 +22,12 @@
     "port": 5432,
     "username": "postgres",
     "password": "postgres",
-    "enableSslAuth": false,
+    "database": "product_catalog",
     "sslPaths": {
+      "enabled": false,
       "ca": "",
       "key": "",
-      "cert": "",
-      "database": ""
+      "cert": ""
     }
   },
   "server": {

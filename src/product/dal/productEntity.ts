@@ -16,8 +16,12 @@ export class ProductEntity {
     type: 'geometry',
     spatialFeatureType: 'Polygon',
     srid: 4326,
+    transformer: {
+      from: (value: string | object) => value,
+      to: (value: string) => value,
+    },
   })
-  public boundingPolygon!: unknown;
+  public boundingPolygon!: string;
 
   @Column({ name: 'consumption_link', type: 'text', nullable: true })
   public consumptionLink!: string | null;

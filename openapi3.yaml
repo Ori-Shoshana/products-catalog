@@ -133,7 +133,7 @@ components:
       in: path
       required: true
       schema:
-        type: string
+        type: integer
 
     Name:
       name: name
@@ -267,10 +267,26 @@ components:
           $ref: '#/components/schemas/ZoomLevel'
 
     Product:
-      allOf:
-        - $ref: '#/components/schemas/ProductInput'
-        - type: object
-          required: [id]
-          properties:
-            id:
-              type: string
+      type: object
+      required: [id, name, type, consumptionProtocol, boundingPolygon]
+      properties:
+        id:
+          type: integer
+          example: 1
+        name:
+          type: string
+        description:
+          type: string
+        boundingPolygon:
+          type: object
+          description: GeoJSON representation of the polygon (as returned by DB)
+        type:
+          $ref: '#/components/schemas/ProductType'
+        consumptionProtocol:
+          $ref: '#/components/schemas/ConsumptionProtocol'
+        resolutionBest:
+          $ref: '#/components/schemas/Resolution'
+        minZoom:
+          $ref: '#/components/schemas/ZoomLevel'
+        maxZoom:
+          $ref: '#/components/schemas/ZoomLevel'

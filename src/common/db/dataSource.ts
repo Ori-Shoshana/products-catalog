@@ -1,31 +1,47 @@
 import 'reflect-metadata';
-import { DataSource } from 'typeorm';
+import { DataSource, DataSourceOptions } from 'typeorm';
+import { ConfigType } from '@common/config';
+import { DbConfig } from '@common/interfaces';
 import { ProductEntity } from '../../product/dal/productEntity';
 
-const host = process.env.DB_HOST ?? 'localhost';
-const port = Number(process.env.DB_PORT);
+let appDataSource: DataSource | undefined;
 
-const username = process.env.DB_USER ?? process.env.DB_USERNAME ?? process.env.POSTGRES_USER;
+const createOptions = (dbConfig: DbConfig): DataSourceOptions => {
+  return {
+    type: 'postgres',
+    host: dbConfig.host,
+    port: Number(dbConfig.port),
+    username: String(dbConfig.username),
+    password: String(dbConfig.password),
+    database: String(dbConfig.database),
+    entities: [ProductEntity],
+    migrationsTableName: 'custom_migration_table',
+    migrations: ['db/migration/*.ts'],
+    synchronize: true,
+    logging: false,
+  };
+};
 
-const password = process.env.DB_PASSWORD ?? process.env.POSTGRES_PASSWORD;
+export const dataSourceFactory = (config: ConfigType): DataSource => {
+  const dbConfig = config.get('db') as DbConfig;
 
-const database = process.env.DB_NAME ?? process.env.DB_DATABASE ?? process.env.POSTGRES_DB;
+  return new DataSource(createOptions(dbConfig));
+};
 
-export const appDataSource = new DataSource({
-  type: 'postgres',
-  host,
-  port,
-  username,
-  password,
-  database,
-  entities: [ProductEntity],
-  synchronize: false,
-  logging: false,
-});
-
-export async function initDataSource(): Promise<DataSource> {
-  if (!appDataSource.isInitialized) {
-    await appDataSource.initialize();
+export async function initDataSource(config: ConfigType): Promise<DataSource> {
+  if (appDataSource?.isInitialized ?? false) {
+    return appDataSource as DataSource;
   }
+
+  appDataSource = dataSourceFactory(config);
+  await appDataSource.initialize();
+
   return appDataSource;
+}
+
+export function getDataSource(): DataSource {
+  if (!(appDataSource?.isInitialized ?? false)) {
+    throw new Error('DataSource is not initialized. Make sure initDataSource was awaited.');
+  }
+  return appDataSource as DataSource;
 }

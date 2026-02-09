@@ -1,7 +1,7 @@
 import { inject, injectable } from 'tsyringe';
 import type { Logger } from '@map-colonies/js-logger';
 import { SERVICES } from '@common/constants';
-import { badRequest, notFound } from '@common/errors';
+import { BadRequestError, NotFoundError } from '@common/errors';
 import { ProductRepository } from '../dal/productRepository';
 import type { Product, ProductCreateInput, ProductUpdateInput, ProductQueryFilters } from './product';
 
@@ -19,19 +19,19 @@ export class ProductManager {
 
   public async getProductById(id: number): Promise<Product> {
     const product = await this.repository.getProductById(id);
-    if (!product) throw notFound('Product not found');
+    if (!product) throw new NotFoundError('Product not found');
     return product;
   }
 
   public async createProduct(input: ProductCreateInput): Promise<Product> {
     if (!input.name) {
-      throw badRequest('Missing required field: name');
+      throw new BadRequestError('Missing required field: name');
     }
     return this.repository.createProduct(input);
   }
   public async updateProduct(id: number, input: ProductUpdateInput): Promise<Product> {
     const updated = await this.repository.updateProduct(id, input);
-    if (!updated) throw notFound('Product not found');
+    if (!updated) throw new NotFoundError('Product not found');
     return updated;
   }
 

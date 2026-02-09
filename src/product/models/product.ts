@@ -1,5 +1,27 @@
-export type ProductType = 'raster' | 'rasterized vector' | '3d tiles' | 'QMesh';
+type FilterableFields = Pick<Product, 'name' | 'type' | 'consumptionProtocol' | 'minZoom' | 'maxZoom' | 'resolutionBest'>;
 
+export interface ProductQueryFilters extends Partial<FilterableFields> {
+  minZoomGreater?: Product['minZoom'];
+  minZoomGreaterEqual?: Product['minZoom'];
+  minZoomLess?: Product['minZoom'];
+  minZoomLessEqual?: Product['minZoom'];
+
+  maxZoomGreater?: Product['maxZoom'];
+  maxZoomGreaterEqual?: Product['maxZoom'];
+  maxZoomLess?: Product['maxZoom'];
+  maxZoomLessEqual?: Product['maxZoom'];
+
+  resolutionBestGreater?: Product['resolutionBest'];
+  resolutionBestGreaterEqual?: Product['resolutionBest'];
+  resolutionBestLess?: Product['resolutionBest'];
+  resolutionBestLessEqual?: Product['resolutionBest'];
+
+  boundingPolygonContains?: Product['boundingPolygon'];
+  boundingPolygonWithin?: Product['boundingPolygon'];
+  boundingPolygonIntersects?: Product['boundingPolygon'];
+}
+
+export type ProductType = 'raster' | 'rasterized vector' | '3d tiles' | 'QMesh';
 export type ConsumptionProtocol = 'WMS' | 'WMTS' | 'XYZ' | '3D Tiles';
 
 export interface Product {
@@ -17,31 +39,3 @@ export interface Product {
 
 export type ProductCreateInput = Omit<Product, 'id'>;
 export type ProductUpdateInput = Partial<ProductCreateInput>;
-
-export interface ProductQueryFilters {
-  name?: string;
-  type?: ProductType;
-  consumptionProtocol?: ConsumptionProtocol;
-
-  minZoom?: number;
-  minZoomGreater?: number;
-  minZoomGreaterEqual?: number;
-  minZoomLess?: number;
-  minZoomLessEqual?: number;
-
-  maxZoom?: number;
-  maxZoomGreater?: number;
-  maxZoomGreaterEqual?: number;
-  maxZoomLess?: number;
-  maxZoomLessEqual?: number;
-
-  resolutionBest?: number;
-  resolutionBestGreater?: number;
-  resolutionBestGreaterEqual?: number;
-  resolutionBestLess?: number;
-  resolutionBestLessEqual?: number;
-
-  boundingPolygonContains?: string;
-  boundingPolygonWithin?: string;
-  boundingPolygonIntersects?: string;
-}

@@ -1,8 +1,8 @@
 import { injectable, inject } from 'tsyringe';
-import { DataSource, SelectQueryBuilder } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import type { Logger } from '@map-colonies/js-logger';
 import { SERVICES } from '../../common/constants';
-import { badRequest, notFound, internalServerError } from '../../common/errors';
+import { BadRequestError, NotFoundError, InternalServerError } from '../../common/errors';
 import type { Product, ProductCreateInput, ProductUpdateInput, ProductQueryFilters } from '../models/product';
 import { ProductEntity } from './productEntity';
 
@@ -12,168 +12,136 @@ export class ProductRepository {
     @inject(SERVICES.LOGGER) private readonly logger: Logger,
     @inject(SERVICES.DB_DATASOURCE) private readonly dataSource: DataSource
   ) {}
+  private get repo(): Repository<ProductEntity> {
+    return this.dataSource.getRepository(ProductEntity);
+  }
 
   public async createProduct(input: ProductCreateInput): Promise<Product> {
     this.logger.info({ msg: 'Creating a new product', productName: input.name });
 
-    const insertResult = await this.dataSource
-      .createQueryBuilder()
-      .insert()
-      .into(ProductEntity)
-      .values({
-        name: input.name,
-        description: input.description ?? null,
-        consumptionLink: input.consumptionLink ?? null,
-        type: input.type,
-        consumptionProtocol: input.consumptionProtocol,
-        resolutionBest: input.resolutionBest ?? null,
-        minZoom: input.minZoom ?? null,
-        maxZoom: input.maxZoom ?? null,
-        boundingPolygon: (): string => `ST_GeomFromText(:wkt)`,
-      })
-      .setParameters({ wkt: input.boundingPolygon })
-      .returning(['id'])
-      .execute();
+    try {
+      const insertResult = await this.repo
+        .createQueryBuilder()
+        .insert()
+        .into(ProductEntity)
+        .values({
+          ...input,
+          boundingPolygon: () => `ST_GeomFromText(:wkt, 4326)`,
+        })
+        .setParameters({ wkt: input.boundingPolygon })
+        .returning(['id'])
+        .execute();
+      const id = insertResult.identifiers[0]?.id as number;
+      const created = await this.getProductById(id);
+      if (!created) {
+        throw new InternalServerError('Product was created but could not be retrieved');
+      }
 
-    const id = insertResult.identifiers[0]?.id as number | undefined;
-    if (id === undefined) {
-      throw internalServerError('Failed to create product - no id returned');
+      return created;
+    } catch (err) {
+      this.logger.error({ err, msg: 'Failed to create product in database' });
+      throw new InternalServerError('Failed to create product in database');
     }
-
-    const created = await this.getProductById(id);
-    if (created === null) {
-      throw internalServerError('Failed to create product - not found after insert');
-    }
-    return created;
   }
 
   public async getProductById(id: number): Promise<Product | null> {
     this.logger.debug({ msg: 'Fetching product by id', productId: id });
-    const row = await this.baseQb().where('p.id = :id', { id }).getRawOne<Product>();
-    return row ?? null;
+    const product = await this.repo.findOne({ where: { id } });
+    return product as Product | null;
   }
 
   public async getAllProducts(): Promise<Product[]> {
     this.logger.debug({ msg: 'Fetching all products' });
-    return this.baseQb().getRawMany<Product>();
+    const products = await this.repo.find();
+    return products as Product[];
   }
 
   public async updateProduct(id: number, input: ProductUpdateInput): Promise<Product | null> {
     this.logger.info({ msg: 'Updating product', productId: id });
 
-    const setObj: Record<string, unknown> = {};
-
-    if (input.name !== undefined) setObj.name = input.name;
-    if (input.description !== undefined) setObj.description = input.description ?? null;
-    if (input.consumptionLink !== undefined) setObj.consumptionLink = input.consumptionLink ?? null;
-    if (input.type !== undefined) setObj.type = input.type;
-    if (input.consumptionProtocol !== undefined) setObj.consumptionProtocol = input.consumptionProtocol;
-    if (input.resolutionBest !== undefined) setObj.resolutionBest = input.resolutionBest ?? null;
-    if (input.minZoom !== undefined) setObj.minZoom = input.minZoom ?? null;
-    if (input.maxZoom !== undefined) setObj.maxZoom = input.maxZoom ?? null;
-
-    let wkt: string | undefined;
-    if (input.boundingPolygon !== undefined) {
-      setObj.boundingPolygon = (): string => `ST_GeomFromText(:wkt)`;
-      wkt = input.boundingPolygon;
+    if (Object.keys(input).length === 0) {
+      throw new BadRequestError('No fields provided for update');
     }
 
-    if (Object.keys(setObj).length === 0) throw badRequest('No fields provided for update');
+    try {
+      const qb = this.repo
+        .createQueryBuilder()
+        .update(ProductEntity)
+        .set({
+          ...input,
+          ...(input.boundingPolygon !== undefined ? { boundingPolygon: () => `ST_GeomFromText(:wkt, 4326)` } : {}),
+        });
 
-    const qb = this.dataSource.createQueryBuilder().update(ProductEntity).set(setObj).where('id = :id', { id });
-    if (wkt !== undefined) qb.setParameters({ wkt });
+      if (input.boundingPolygon !== undefined) qb.setParameters({ wkt: input.boundingPolygon });
 
-    await qb.execute();
+      const res = await qb.where('id = :id', { id }).execute();
 
-    return this.getProductById(id);
+      if (res.affected === 0) throw new NotFoundError(`Product with id ${id} was not found`);
+
+      return await this.getProductById(id);
+    } catch (err) {
+      if (err instanceof NotFoundError) throw err;
+      this.logger.error({ err, msg: 'Failed to update product in database' });
+      throw new InternalServerError('Failed to update product in database');
+    }
   }
 
   public async deleteProduct(id: number): Promise<void> {
     this.logger.info({ msg: 'Deleting product', productId: id });
-    const res = await this.dataSource.getRepository(ProductEntity).delete({ id });
-    const deleted = (res.affected ?? 0) === 1;
-    if (!deleted) throw notFound(`Product with id ${id} was not found`);
+    const res = await this.repo.delete(id);
+    if (res.affected === 0) {
+      throw new NotFoundError(`Product with id ${id} was not found`);
+    }
   }
 
   public async queryProducts(filters: ProductQueryFilters): Promise<Product[]> {
     this.logger.debug({ msg: 'Querying products with filters', filters });
 
-    const qb = this.baseQb();
+    const qb = this.repo.createQueryBuilder('p');
 
     const add = (condition: string, params: Record<string, unknown>, value: unknown): void => {
-      if (value !== undefined) qb.andWhere(condition, params);
+      if (value !== undefined && value !== null) {
+        qb.andWhere(condition, params);
+      }
     };
 
-    // equals
     add('p.name = :name', { name: filters.name }, filters.name);
     add('p.type = :type', { type: filters.type }, filters.type);
-    add('p.consumption_protocol = :consumptionProtocol', { consumptionProtocol: filters.consumptionProtocol }, filters.consumptionProtocol);
+    add('p.consumptionProtocol = :protocol', { protocol: filters.consumptionProtocol }, filters.consumptionProtocol);
 
-    add('p.min_zoom = :minZoom', { minZoom: filters.minZoom }, filters.minZoom);
-    add('p.max_zoom = :maxZoom', { maxZoom: filters.maxZoom }, filters.maxZoom);
-    add('p.resolution_best = :resolutionBest', { resolutionBest: filters.resolutionBest }, filters.resolutionBest);
+    add('p.minZoom > :minZG', { minZG: filters.minZoomGreater }, filters.minZoomGreater);
+    add('p.minZoom >= :minZGE', { minZGE: filters.minZoomGreaterEqual }, filters.minZoomGreaterEqual);
+    add('p.minZoom < :minZL', { minZL: filters.minZoomLess }, filters.minZoomLess);
+    add('p.minZoom <= :minZLE', { minZLE: filters.minZoomLessEqual }, filters.minZoomLessEqual);
 
-    // comparisons: minZoom
-    add('p.min_zoom > :minZoomGreater', { minZoomGreater: filters.minZoomGreater }, filters.minZoomGreater);
-    add('p.min_zoom >= :minZoomGreaterEqual', { minZoomGreaterEqual: filters.minZoomGreaterEqual }, filters.minZoomGreaterEqual);
-    add('p.min_zoom < :minZoomLess', { minZoomLess: filters.minZoomLess }, filters.minZoomLess);
-    add('p.min_zoom <= :minZoomLessEqual', { minZoomLessEqual: filters.minZoomLessEqual }, filters.minZoomLessEqual);
+    add('p.maxZoom > :maxZG', { maxZG: filters.maxZoomGreater }, filters.maxZoomGreater);
+    add('p.maxZoom >= :maxZGE', { maxZGE: filters.maxZoomGreaterEqual }, filters.maxZoomGreaterEqual);
+    add('p.maxZoom < :maxZL', { maxZL: filters.maxZoomLess }, filters.maxZoomLess);
+    add('p.maxZoom <= :maxZLE', { maxZLE: filters.maxZoomLessEqual }, filters.maxZoomLessEqual);
 
-    // comparisons: maxZoom
-    add('p.max_zoom > :maxZoomGreater', { maxZoomGreater: filters.maxZoomGreater }, filters.maxZoomGreater);
-    add('p.max_zoom >= :maxZoomGreaterEqual', { maxZoomGreaterEqual: filters.maxZoomGreaterEqual }, filters.maxZoomGreaterEqual);
-    add('p.max_zoom < :maxZoomLess', { maxZoomLess: filters.maxZoomLess }, filters.maxZoomLess);
-    add('p.max_zoom <= :maxZoomLessEqual', { maxZoomLessEqual: filters.maxZoomLessEqual }, filters.maxZoomLessEqual);
+    add('p.resolutionBest > :resG', { resG: filters.resolutionBestGreater }, filters.resolutionBestGreater);
+    add('p.resolutionBest >= :resGE', { resGE: filters.resolutionBestGreaterEqual }, filters.resolutionBestGreaterEqual);
+    add('p.resolutionBest < :resL', { resL: filters.resolutionBestLess }, filters.resolutionBestLess);
+    add('p.resolutionBest <= :resLE', { resLE: filters.resolutionBestLessEqual }, filters.resolutionBestLessEqual);
 
-    // comparisons: resolutionBest
-    add('p.resolution_best > :resolutionBestGreater', { resolutionBestGreater: filters.resolutionBestGreater }, filters.resolutionBestGreater);
-    add(
-      'p.resolution_best >= :resolutionBestGreaterEqual',
-      { resolutionBestGreaterEqual: filters.resolutionBestGreaterEqual },
-      filters.resolutionBestGreaterEqual
-    );
-    add('p.resolution_best < :resolutionBestLess', { resolutionBestLess: filters.resolutionBestLess }, filters.resolutionBestLess);
-    add(
-      'p.resolution_best <= :resolutionBestLessEqual',
-      { resolutionBestLessEqual: filters.resolutionBestLessEqual },
-      filters.resolutionBestLessEqual
-    );
+    if (filters.boundingPolygonContains != null) {
+      add(
+        'ST_Contains(p.boundingPolygon, ST_GeomFromText(:contains, 4326))',
+        { contains: filters.boundingPolygonContains },
+        filters.boundingPolygonContains
+      );
+    }
+    if (filters.boundingPolygonWithin != null) {
+      add('ST_Within(p.boundingPolygon, ST_GeomFromText(:within, 4326))', { within: filters.boundingPolygonWithin }, filters.boundingPolygonWithin);
+    }
+    if (filters.boundingPolygonIntersects != null) {
+      add(
+        'ST_Intersects(p.boundingPolygon, ST_GeomFromText(:intersects, 4326))',
+        { intersects: filters.boundingPolygonIntersects },
+        filters.boundingPolygonIntersects
+      );
+    }
 
-    // spatial
-    add(
-      'ST_Contains(p.bounding_polygon, ST_GeomFromText(:boundingPolygonContains))',
-      { boundingPolygonContains: filters.boundingPolygonContains },
-      filters.boundingPolygonContains
-    );
-    add(
-      'ST_Within(p.bounding_polygon, ST_GeomFromText(:boundingPolygonWithin))',
-      { boundingPolygonWithin: filters.boundingPolygonWithin },
-      filters.boundingPolygonWithin
-    );
-    add(
-      'ST_Intersects(p.bounding_polygon, ST_GeomFromText(:boundingPolygonIntersects))',
-      { boundingPolygonIntersects: filters.boundingPolygonIntersects },
-      filters.boundingPolygonIntersects
-    );
-
-    return qb.getRawMany<Product>();
-  }
-
-  private baseQb(): SelectQueryBuilder<ProductEntity> {
-    return this.dataSource
-      .getRepository(ProductEntity)
-      .createQueryBuilder('p')
-      .select([
-        `p.id::text as "id"`,
-        `p.name as "name"`,
-        `p.description as "description"`,
-        `ST_AsText(p.bounding_polygon) as "boundingPolygon"`,
-        `p.consumption_link as "consumptionLink"`,
-        `p.type as "type"`,
-        `p.consumption_protocol as "consumptionProtocol"`,
-        `p.resolution_best as "resolutionBest"`,
-        `p.min_zoom as "minZoom"`,
-        `p.max_zoom as "maxZoom"`,
-      ]);
+    return qb.getMany() as Promise<Product[]>;
   }
 }

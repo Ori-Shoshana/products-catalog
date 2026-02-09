@@ -20,6 +20,10 @@ describe('docs', function () {
       override: [
         { token: SERVICES.LOGGER, provider: { useValue: jsLogger({ enabled: false }) } },
         { token: SERVICES.TRACER, provider: { useValue: trace.getTracer('testTracer') } },
+        {
+          token: SERVICES.DB_DATASOURCE,
+          provider: { useValue: { isInitialized: true } },
+        },
       ],
       useChild: true,
     });
@@ -30,7 +34,7 @@ describe('docs', function () {
   });
 
   afterAll(async function () {
-    if (dataSource.isInitialized) {
+    if (dataSource.isInitialized && typeof dataSource.destroy === 'function') {
       await dataSource.destroy();
     }
   });
