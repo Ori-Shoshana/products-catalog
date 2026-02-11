@@ -134,6 +134,7 @@ components:
       required: true
       schema:
         type: integer
+        minimum: 1
 
     Name:
       name: name

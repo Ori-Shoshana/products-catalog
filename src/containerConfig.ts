@@ -1,7 +1,7 @@
 import { getOtelMixin } from '@map-colonies/telemetry';
 import { trace } from '@opentelemetry/api';
 import { Registry } from 'prom-client';
-import { DataSource } from 'typeorm';
+import { DataSource, Repository } from 'typeorm';
 import { DependencyContainer } from 'tsyringe';
 import jsLogger from '@map-colonies/js-logger';
 import { InjectionObject, registerDependencies } from '@common/dependencyRegistration';
@@ -13,6 +13,7 @@ import { ProductRepository } from './product/dal/productRepository';
 import { ProductManager } from './product/models/productManager';
 import { ProductController } from './product/controllers/productController';
 import { productRouterFactory, PRODUCT_ROUTER_SYMBOL } from './product/routes/productRouter';
+import { ProductEntity } from './product/dal/productEntity';
 
 export interface RegisterOptions {
   override?: InjectionObject<unknown>[];
@@ -45,6 +46,14 @@ export const registerExternalValues = async (options?: RegisterOptions): Promise
       provider: {
         useFactory: (): DataSource => {
           return getDataSource();
+        },
+      },
+    },
+    {
+      token: SERVICES.PRODUCT_ENTITY_REPOSITORY,
+      provider: {
+        useFactory: (): Repository<ProductEntity> => {
+          return getDataSource().getRepository(ProductEntity);
         },
       },
     },

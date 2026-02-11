@@ -1,5 +1,5 @@
 import { injectable, inject } from 'tsyringe';
-import { DataSource, Repository } from 'typeorm';
+import { Repository } from 'typeorm';
 import type { Logger } from '@map-colonies/js-logger';
 import { SERVICES } from '../../common/constants';
 import { BadRequestError, NotFoundError, InternalServerError } from '../../common/errors';
@@ -10,11 +10,8 @@ import { ProductEntity } from './productEntity';
 export class ProductRepository {
   public constructor(
     @inject(SERVICES.LOGGER) private readonly logger: Logger,
-    @inject(SERVICES.DB_DATASOURCE) private readonly dataSource: DataSource
+    @inject(SERVICES.PRODUCT_ENTITY_REPOSITORY) private readonly repo: Repository<ProductEntity>
   ) {}
-  private get repo(): Repository<ProductEntity> {
-    return this.dataSource.getRepository(ProductEntity);
-  }
 
   public async createProduct(input: ProductCreateInput): Promise<Product> {
     this.logger.info({ msg: 'Creating a new product', productName: input.name });
@@ -50,12 +47,6 @@ export class ProductRepository {
     return product as Product | null;
   }
 
-  public async getAllProducts(): Promise<Product[]> {
-    this.logger.debug({ msg: 'Fetching all products' });
-    const products = await this.repo.find();
-    return products as Product[];
-  }
-
   public async updateProduct(id: number, input: ProductUpdateInput): Promise<Product | null> {
     this.logger.info({ msg: 'Updating product', productId: id });
 
@@ -69,10 +60,10 @@ export class ProductRepository {
         .update(ProductEntity)
         .set({
           ...input,
-          ...(input.boundingPolygon !== undefined ? { boundingPolygon: () => `ST_GeomFromText(:wkt, 4326)` } : {}),
+          ...(input.boundingPolygon != null ? { boundingPolygon: (): string => `ST_GeomFromText(:wkt, 4326)` } : {}),
         });
 
-      if (input.boundingPolygon !== undefined) qb.setParameters({ wkt: input.boundingPolygon });
+      if (input.boundingPolygon != null) qb.setParameters({ wkt: input.boundingPolygon });
 
       const res = await qb.where('id = :id', { id }).execute();
 
@@ -99,47 +90,57 @@ export class ProductRepository {
 
     const qb = this.repo.createQueryBuilder('p');
 
-    const add = (condition: string, params: Record<string, unknown>, value: unknown): void => {
-      if (value !== undefined && value !== null) {
-        qb.andWhere(condition, params);
+    // Simple equality filters
+    const equalityFilters: { field: string; paramKey: string; value: unknown }[] = [
+      { field: 'p.name', paramKey: 'name', value: filters.name },
+      { field: 'p.type', paramKey: 'type', value: filters.type },
+      { field: 'p.consumptionProtocol', paramKey: 'protocol', value: filters.consumptionProtocol },
+    ];
+
+    // Range filters (greater/less comparisons)
+    const rangeFilters: { field: string; operator: string; paramKey: string; value: unknown }[] = [
+      { field: 'p.minZoom', operator: '>', paramKey: 'minZoomG', value: filters.minZoomGreater },
+      { field: 'p.minZoom', operator: '>=', paramKey: 'minZoomGE', value: filters.minZoomGreaterEqual },
+      { field: 'p.minZoom', operator: '<', paramKey: 'minZoomL', value: filters.minZoomLess },
+      { field: 'p.minZoom', operator: '<=', paramKey: 'minZoomLE', value: filters.minZoomLessEqual },
+      { field: 'p.maxZoom', operator: '>', paramKey: 'maxZoomG', value: filters.maxZoomGreater },
+      { field: 'p.maxZoom', operator: '>=', paramKey: 'maxZoomGE', value: filters.maxZoomGreaterEqual },
+      { field: 'p.maxZoom', operator: '<', paramKey: 'maxZoomL', value: filters.maxZoomLess },
+      { field: 'p.maxZoom', operator: '<=', paramKey: 'maxZoomLE', value: filters.maxZoomLessEqual },
+      { field: 'p.resolutionBest', operator: '>', paramKey: 'resolutionBestG', value: filters.resolutionBestGreater },
+      { field: 'p.resolutionBest', operator: '>=', paramKey: 'resolutionBestGE', value: filters.resolutionBestGreaterEqual },
+      { field: 'p.resolutionBest', operator: '<', paramKey: 'resolutionBestL', value: filters.resolutionBestLess },
+      { field: 'p.resolutionBest', operator: '<=', paramKey: 'resolutionBestLE', value: filters.resolutionBestLessEqual },
+    ];
+
+    // Spatial filters
+    const spatialFilters: { condition: string; paramKey: string; value: unknown }[] = [
+      { condition: 'ST_Contains(p.boundingPolygon, ST_GeomFromText(:contains, 4326))', paramKey: 'contains', value: filters.boundingPolygonContains },
+      { condition: 'ST_Within(p.boundingPolygon, ST_GeomFromText(:within, 4326))', paramKey: 'within', value: filters.boundingPolygonWithin },
+      {
+        condition: 'ST_Intersects(p.boundingPolygon, ST_GeomFromText(:intersects, 4326))',
+        paramKey: 'intersects',
+        value: filters.boundingPolygonIntersects,
+      },
+    ];
+
+    // Apply all filters
+    for (const { field, paramKey, value } of equalityFilters) {
+      if (value != null) {
+        qb.andWhere(`${field} = :${paramKey}`, { [paramKey]: value });
       }
-    };
-
-    add('p.name = :name', { name: filters.name }, filters.name);
-    add('p.type = :type', { type: filters.type }, filters.type);
-    add('p.consumptionProtocol = :protocol', { protocol: filters.consumptionProtocol }, filters.consumptionProtocol);
-
-    add('p.minZoom > :minZG', { minZG: filters.minZoomGreater }, filters.minZoomGreater);
-    add('p.minZoom >= :minZGE', { minZGE: filters.minZoomGreaterEqual }, filters.minZoomGreaterEqual);
-    add('p.minZoom < :minZL', { minZL: filters.minZoomLess }, filters.minZoomLess);
-    add('p.minZoom <= :minZLE', { minZLE: filters.minZoomLessEqual }, filters.minZoomLessEqual);
-
-    add('p.maxZoom > :maxZG', { maxZG: filters.maxZoomGreater }, filters.maxZoomGreater);
-    add('p.maxZoom >= :maxZGE', { maxZGE: filters.maxZoomGreaterEqual }, filters.maxZoomGreaterEqual);
-    add('p.maxZoom < :maxZL', { maxZL: filters.maxZoomLess }, filters.maxZoomLess);
-    add('p.maxZoom <= :maxZLE', { maxZLE: filters.maxZoomLessEqual }, filters.maxZoomLessEqual);
-
-    add('p.resolutionBest > :resG', { resG: filters.resolutionBestGreater }, filters.resolutionBestGreater);
-    add('p.resolutionBest >= :resGE', { resGE: filters.resolutionBestGreaterEqual }, filters.resolutionBestGreaterEqual);
-    add('p.resolutionBest < :resL', { resL: filters.resolutionBestLess }, filters.resolutionBestLess);
-    add('p.resolutionBest <= :resLE', { resLE: filters.resolutionBestLessEqual }, filters.resolutionBestLessEqual);
-
-    if (filters.boundingPolygonContains != null) {
-      add(
-        'ST_Contains(p.boundingPolygon, ST_GeomFromText(:contains, 4326))',
-        { contains: filters.boundingPolygonContains },
-        filters.boundingPolygonContains
-      );
     }
-    if (filters.boundingPolygonWithin != null) {
-      add('ST_Within(p.boundingPolygon, ST_GeomFromText(:within, 4326))', { within: filters.boundingPolygonWithin }, filters.boundingPolygonWithin);
+
+    for (const { field, operator, paramKey, value } of rangeFilters) {
+      if (value != null) {
+        qb.andWhere(`${field} ${operator} :${paramKey}`, { [paramKey]: value });
+      }
     }
-    if (filters.boundingPolygonIntersects != null) {
-      add(
-        'ST_Intersects(p.boundingPolygon, ST_GeomFromText(:intersects, 4326))',
-        { intersects: filters.boundingPolygonIntersects },
-        filters.boundingPolygonIntersects
-      );
+
+    for (const { condition, paramKey, value } of spatialFilters) {
+      if (value != null) {
+        qb.andWhere(condition, { [paramKey]: value });
+      }
     }
 
     return qb.getMany() as Promise<Product[]>;

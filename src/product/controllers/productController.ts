@@ -3,20 +3,19 @@ import httpStatus from 'http-status-codes';
 import { injectable, inject } from 'tsyringe';
 import { type Registry, Counter } from 'prom-client';
 import type { Logger } from '@map-colonies/js-logger';
-import { BadRequestError } from '@src/common/errors';
 import { SERVICES } from '@common/constants';
 import { ProductManager } from '../models/productManager';
-import type { ProductCreateInput, ProductUpdateInput, ProductQueryFilters } from '../models/product';
+import type { ProductCreateInput, ProductUpdateInput, ProductQueryFilters, Product } from '../models/product';
 
 interface ProductParams {
   id: string;
 }
 
-type GetProductsHandler = RequestHandler<undefined, unknown, unknown, ProductQueryFilters>;
-type GetProductByIdHandler = RequestHandler<ProductParams>;
-type CreateProductHandler = RequestHandler<undefined, unknown, ProductCreateInput>;
-type UpdateProductHandler = RequestHandler<ProductParams, unknown, ProductUpdateInput>;
-type DeleteProductHandler = RequestHandler<ProductParams>;
+type GetProductsHandler = RequestHandler<undefined, Product[], undefined, ProductQueryFilters>;
+type GetProductByIdHandler = RequestHandler<ProductParams, Product>;
+type CreateProductHandler = RequestHandler<undefined, Product, ProductCreateInput>;
+type UpdateProductHandler = RequestHandler<ProductParams, Product, ProductUpdateInput>;
+type DeleteProductHandler = RequestHandler<ProductParams, void, undefined>;
 
 @injectable()
 export class ProductController {
@@ -38,27 +37,29 @@ export class ProductController {
     try {
       const products = await this.manager.getProducts(req.query);
       return res.status(httpStatus.OK).json(products);
-    } catch (error: unknown) {
+    } catch (error) {
       return next(error);
     }
   };
 
   public getProductById: GetProductByIdHandler = async (req, res, next) => {
     try {
-      const id = this.parseId(req.params.id);
+      const id = Number(req.params.id);
       const product = await this.manager.getProductById(id);
       return res.status(httpStatus.OK).json(product);
-    } catch (error: unknown) {
+    } catch (error) {
       return next(error);
     }
   };
 
   public createProduct: CreateProductHandler = async (req, res, next) => {
     try {
+      this.logger.info({ body: req.body }, 'createProduct incoming');
+
       const created = await this.manager.createProduct(req.body);
       this.createdProductsCounter.inc(1);
       return res.status(httpStatus.CREATED).json(created);
-    } catch (error: unknown) {
+    } catch (error) {
       this.logger.error({ err: error }, 'failed to create product');
       return next(error);
     }
@@ -68,10 +69,10 @@ export class ProductController {
     try {
       this.logger.info({ idParam: req.params.id, body: req.body }, 'updateProduct incoming');
 
-      const id = this.parseId(req.params.id);
+      const id = Number(req.params.id);
       const updated = await this.manager.updateProduct(id, req.body);
       return res.status(httpStatus.OK).json(updated);
-    } catch (error: unknown) {
+    } catch (error) {
       this.logger.error({ err: error }, 'failed to update product');
       return next(error);
     }
@@ -80,18 +81,12 @@ export class ProductController {
     try {
       this.logger.info({ idParam: req.params.id }, 'deleteProduct incoming');
 
-      const id = this.parseId(req.params.id);
+      const id = Number(req.params.id);
       await this.manager.deleteProduct(id);
       return res.status(httpStatus.NO_CONTENT).send();
-    } catch (error: unknown) {
+    } catch (error) {
       this.logger.error({ err: error }, 'failed to delete product');
       return next(error);
     }
   };
-  private parseId(idParam: string): number {
-    const trimmed = idParam.trim();
-    const id = Number(trimmed);
-    if (!Number.isSafeInteger(id) || id <= 0) throw new BadRequestError(`Invalid product ID: ${idParam}`);
-    return id;
-  }
 }

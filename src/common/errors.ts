@@ -1,38 +1,35 @@
 import httpStatus from 'http-status-codes';
 import { HttpError } from '@map-colonies/error-express-handler';
 
-export class BadRequestError extends Error implements HttpError {
-  public readonly status = httpStatus.BAD_REQUEST;
+export abstract class BaseHttpError extends Error implements HttpError {
+  public readonly status: number;
 
-  public constructor(message: string) {
+  public constructor(status: number, message: string) {
     super(message);
-    this.name = 'BadRequestError';
+    this.status = status;
   }
 }
 
-export class InternalServerError extends Error implements HttpError {
-  public readonly status = httpStatus.INTERNAL_SERVER_ERROR;
-
+export class BadRequestError extends BaseHttpError {
   public constructor(message: string) {
-    super(message);
-    this.name = 'InternalServerError';
+    super(httpStatus.BAD_REQUEST, message);
   }
 }
 
-export class NotFoundError extends Error implements HttpError {
-  public readonly status = httpStatus.NOT_FOUND;
-
+export class NotFoundError extends BaseHttpError {
   public constructor(message: string) {
-    super(message);
-    this.name = 'NotFoundError';
+    super(httpStatus.NOT_FOUND, message);
   }
 }
 
-export class ServiceUnavailableError extends Error implements HttpError {
-  public readonly status = httpStatus.SERVICE_UNAVAILABLE;
-
+export class InternalServerError extends BaseHttpError {
   public constructor(message: string) {
-    super(message);
-    this.name = 'ServiceUnavailableError';
+    super(httpStatus.INTERNAL_SERVER_ERROR, message);
+  }
+}
+
+export class ServiceUnavailableError extends BaseHttpError {
+  public constructor(message: string) {
+    super(httpStatus.SERVICE_UNAVAILABLE, message);
   }
 }

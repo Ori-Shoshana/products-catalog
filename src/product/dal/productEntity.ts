@@ -1,4 +1,5 @@
 import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import type { ProductType, ConsumptionProtocol } from '../models/product';
 
 @Entity({ name: 'products' })
 export class ProductEntity {
@@ -27,10 +28,10 @@ export class ProductEntity {
   public consumptionLink!: string | null;
 
   @Column({ name: 'type', type: 'text' })
-  public type!: string;
+  public type!: ProductType;
 
   @Column({ name: 'consumption_protocol', type: 'text' })
-  public consumptionProtocol!: string;
+  public consumptionProtocol!: ConsumptionProtocol;
 
   @Column({ name: 'resolution_best', type: 'double precision', nullable: true })
   public resolutionBest!: number | null;

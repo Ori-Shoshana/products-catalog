@@ -75,8 +75,18 @@ export type components = {
       minZoom?: components['schemas']['ZoomLevel'];
       maxZoom?: components['schemas']['ZoomLevel'];
     };
-    Product: components['schemas']['ProductInput'] & {
-      id: string;
+    Product: {
+      /** @example 1 */
+      id: number;
+      name: string;
+      description?: string;
+      /** @description GeoJSON representation of the polygon (as returned by DB) */
+      boundingPolygon: Record<string, never>;
+      type: components['schemas']['ProductType'];
+      consumptionProtocol: components['schemas']['ConsumptionProtocol'];
+      resolutionBest?: components['schemas']['Resolution'];
+      minZoom?: components['schemas']['ZoomLevel'];
+      maxZoom?: components['schemas']['ZoomLevel'];
     };
   };
   responses: {
@@ -100,7 +110,7 @@ export type components = {
     };
   };
   parameters: {
-    ProductId: string;
+    ProductId: number;
     Name: string;
     ProductType: components['schemas']['ProductType'];
     ConsumptionProtocol: components['schemas']['ConsumptionProtocol'];
