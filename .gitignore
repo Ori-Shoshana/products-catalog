@@ -110,3 +110,17 @@ dist
 # Jest
 jest_html_reporters.html
 reports
+
+# deps
+node_modules/
+
+# builds
+dist/
+
+# test outputs
+coverage/
+reports/
+
+# env files
+.env
+.env.*

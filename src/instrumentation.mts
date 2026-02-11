@@ -3,10 +3,13 @@
 // Because this file is a module it should imported using the `--import` flag in the `node` command, and should not be imported by any other file.
 import { tracingFactory } from './common/tracing.js';
 import { getConfig, initConfig } from './common/config.js';
+import { initDataSource } from './common/db/dataSource.js';
 
-await initConfig();
+await initConfig(true);
 
 const config = getConfig();
+
+await initDataSource(config);
 
 const tracingConfig = config.get('telemetry.tracing');
 const sharedConfig = config.get('telemetry.shared');

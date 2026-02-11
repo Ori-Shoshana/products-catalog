@@ -78,26 +78,18 @@ jobs:
 
     services:
       postgis:
-        image: postgis/postgis:14-3.4
+        image: postgis/postgis:15-3.4
         env:
           POSTGRES_USER: postgres
           POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
+          POSTGRES_DB: product_catalog
         ports:
           - 5432:5432
         options: >-
-          --health-cmd "pg_isready -U postgres -d postgres"
+          --health-cmd "pg_isready -U postgres -d product_catalog"
           --health-interval 10s
           --health-timeout 5s
           --health-retries 10
-
-    env:
-      DB_HOST: localhost
-      DB_PORT: '5432'
-      DB_USER: postgres
-      DB_PASSWORD: postgres
-      DB_NAME: postgres
-      NODE_ENV: test
 
     steps:
       - name: Check out Git repository
@@ -110,6 +102,13 @@ jobs:
 
       - name: Run tests
         run: npm run test
+        env:
+          DB__HOST: localhost
+          DB__PORT: 5432
+          DB__USERNAME: postgres
+          DB__PASSWORD: postgres
+          DB__DATABASE: product_catalog
+          NODE_ENV: test
 
       - uses: actions/upload-artifact@v4
         with:

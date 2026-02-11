@@ -17,6 +17,7 @@ module.exports = {
     '!*/common/**',
     '!**/controllers/**',
     '!**/routes/**',
+    '!**/dal/**',
     '!<rootDir>/src/*',
   ],
   coverageDirectory: '<rootDir>/coverage/unit',
@@ -26,6 +27,8 @@ module.exports = {
   ],
   rootDir: '../../../.',
   setupFiles: ['<rootDir>/tests/configurations/jest.setup.ts'],
+  setupFilesAfterEnv: ['<rootDir>/tests/configurations/jest.afterEnv.ts'],
+
   testEnvironment: 'node',
   coverageThreshold: {
     global: {

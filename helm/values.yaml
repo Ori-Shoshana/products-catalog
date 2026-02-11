@@ -20,10 +20,10 @@ nameOverride: ""
 fullnameOverride: ""
 
 configManagement:
-  offlineMode: false
+  offlineMode: true
   name: 'service-name'
   version: 'latest'
-  serverUrl: 'http://localhost:8080/api'
+  serverUrl: 'http://config-service-config-server-service:8080/api'
 
 livenessProbe:
   enabled: true
@@ -55,8 +55,7 @@ args: []
 sidecars: []
 
 cloudProvider:
-  dockerRegistryUrl: ''
-  imagePullSecretName: ''
+  imagePullSecretName: 'acr-secret'
   flavor: openshift
 
 caSecretName: ''
@@ -64,9 +63,9 @@ caPath: '/usr/local/share/ca-certificates'
 caKey: 'ca.crt'
 
 image:
-  repository: ts-server-boilerplate
+  repository: products-catalog
   # If commented, appVersion will be taken. See: _helpers.tpl
-  # tag: 'latest'
+  tag: '1.0'
   pullPolicy: IfNotPresent
 
 env:
@@ -77,12 +76,22 @@ env:
   logPrettyPrintEnabled: false
   responseCompressionEnabled: true
   requestPayloadLimit: 1mb
+  db:
+    host: postgresql-postgis
+    port: 5432
+    name: product_catalog
   tracing:
     enabled: false
     url: http://localhost:55681/v1/trace
   metrics:
     enabled: false
     url: http://localhost:55681/v1/metrics
+
+db:
+  authentication:
+    existingSecret: "postgresql-secret"
+    userKey: "POSTGRES_USER"
+    passwordKey: "POSTGRES_PASSWORD"
 
 resources:
   enabled: true

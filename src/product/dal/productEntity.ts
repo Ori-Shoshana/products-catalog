@@ -1,0 +1,44 @@
+import { Column, Entity, PrimaryGeneratedColumn } from 'typeorm';
+import type { ProductType, ConsumptionProtocol } from '../models/product';
+
+@Entity({ name: 'products' })
+export class ProductEntity {
+  @PrimaryGeneratedColumn({ name: 'id' })
+  public id!: number;
+
+  @Column({ name: 'name', type: 'text' })
+  public name!: string;
+
+  @Column({ name: 'description', type: 'text', nullable: true })
+  public description!: string | null;
+
+  @Column({
+    name: 'bounding_polygon',
+    type: 'geometry',
+    spatialFeatureType: 'Polygon',
+    srid: 4326,
+    transformer: {
+      from: (value: string | object) => value,
+      to: (value: string) => value,
+    },
+  })
+  public boundingPolygon!: string;
+
+  @Column({ name: 'consumption_link', type: 'text', nullable: true })
+  public consumptionLink!: string | null;
+
+  @Column({ name: 'type', type: 'text' })
+  public type!: ProductType;
+
+  @Column({ name: 'consumption_protocol', type: 'text' })
+  public consumptionProtocol!: ConsumptionProtocol;
+
+  @Column({ name: 'resolution_best', type: 'double precision', nullable: true })
+  public resolutionBest!: number | null;
+
+  @Column({ name: 'min_zoom', type: 'int', nullable: true })
+  public minZoom!: number | null;
+
+  @Column({ name: 'max_zoom', type: 'int', nullable: true })
+  public maxZoom!: number | null;
+}
