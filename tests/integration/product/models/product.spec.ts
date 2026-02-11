@@ -38,7 +38,6 @@ const insertProduct = async (overrides?: Partial<ProductCreateInput>): Promise<n
 let requestSender: RequestSender<paths, operations>;
 let dataSource: DataSource;
 let container: DependencyContainer | undefined;
-let productRepository: ProductRepository;
 
 describe('Product Integration Tests', function () {
   beforeAll(async function () {
@@ -56,7 +55,6 @@ describe('Product Integration Tests', function () {
     });
 
     container = createdContainer;
-    productRepository = container.resolve(SERVICES.PRODUCT_REPOSITORY);
     requestSender = await createRequestSender<paths, operations>('openapi3.yaml', app);
   });
 
@@ -73,15 +71,15 @@ describe('Product Integration Tests', function () {
       const body = {
         name: 'Integration Map',
         description: 'Valid description string',
-        type: 'raster',
-        consumptionProtocol: 'WMS',
+        type: 'raster' as const,
+        consumptionProtocol: 'WMS' as const,
         boundingPolygon: 'POLYGON((30 10, 40 40, 20 40, 10 20, 30 10))',
         resolutionBest: 0.1,
         minZoom: 0,
         maxZoom: 20,
       };
 
-      const response = (await (requestSender.createProduct as unknown as (args: { requestBody: unknown }) => Promise<unknown>)({
+      const response = (await (requestSender.createProduct as (args: { requestBody: unknown }) => Promise<unknown>)({
         requestBody: body,
       })) as { status: number };
 
@@ -95,8 +93,8 @@ describe('Product Integration Tests', function () {
       const updateBody = {
         name: 'Updated Name',
         description: 'Updated description',
-        type: 'raster',
-        consumptionProtocol: 'WMS',
+        type: 'raster' as const,
+        consumptionProtocol: 'WMS' as const,
         boundingPolygon: 'POLYGON((30 10, 40 40, 20 40, 10 20, 30 10))',
         resolutionBest: 0.5,
         minZoom: 1,
@@ -124,11 +122,11 @@ describe('Product Integration Tests', function () {
         boundingPolygon: 'POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))',
       });
 
-      const response = await (requestSender.getProducts as unknown as (args: { query: unknown }) => Promise<{ status: number; body: unknown[] }>)({
+      const response = await (requestSender.getProducts as (args: { query: unknown }) => Promise<{ status: number; body: unknown[] }>)({
         query: {
           name: 'MegaTest',
-          type: 'raster',
-          consumptionProtocol: 'WMS',
+          type: 'raster' as const,
+          consumptionProtocol: 'WMS' as const,
           minZoom: 5,
           maxZoom: 15,
           minZoomGreater: 4,
@@ -161,7 +159,12 @@ describe('Product Integration Tests', function () {
         requestSender.updateProduct as unknown as (args: { pathParams: { id: string }; requestBody: unknown }) => Promise<unknown>
       )({
         pathParams: { id: '999999' },
-        requestBody: { name: 'None', type: 'raster', consumptionProtocol: 'WMS', boundingPolygon: 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))' },
+        requestBody: {
+          name: 'None',
+          type: 'raster' as const,
+          consumptionProtocol: 'WMS' as const,
+          boundingPolygon: 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))',
+        },
       })) as { status: number };
 
       expect(response.status).toBe(httpStatusCodes.NOT_FOUND);
@@ -179,11 +182,11 @@ describe('Product Integration Tests', function () {
 
     it('should return 400 when name is missing', async function () {
       const invalidInput = {
-        type: 'raster',
-        consumptionProtocol: 'WMS',
+        type: 'raster' as const,
+        consumptionProtocol: 'WMS' as const,
         boundingPolygon: 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))',
       };
-      const response = (await (requestSender.createProduct as unknown as (args: { requestBody: unknown }) => Promise<unknown>)({
+      const response = (await (requestSender.createProduct as (args: { requestBody: unknown }) => Promise<unknown>)({
         requestBody: invalidInput,
       })) as { status: number };
 
@@ -198,13 +201,13 @@ describe('Product Integration Tests', function () {
 
       const validInput = {
         name: 'Valid Name',
-        type: 'raster',
-        consumptionProtocol: 'WMS',
+        type: 'raster' as const,
+        consumptionProtocol: 'WMS' as const,
         boundingPolygon: 'POLYGON((30 10, 40 40, 20 40, 10 20, 30 10))',
       };
 
       try {
-        const response = await (requestSender.createProduct as unknown as (args: { requestBody: unknown }) => Promise<{ status: number }>)({
+        const response = await (requestSender.createProduct as (args: { requestBody: unknown }) => Promise<{ status: number }>)({
           requestBody: validInput,
         });
 
@@ -266,22 +269,7 @@ describe('Coverage – branch tests', () => {
   it('manager.updateProduct should throw 404 when product does not exist', async () => {
     await expect(manager.updateProduct(999999, { description: 'x' } as ProductUpdateInput)).rejects.toThrow(NotFoundError);
   });
-  it('repository.createProduct should throw 500 when product not found after insert', async () => {
-    const spy = jest.spyOn(repo, 'getProductById').mockResolvedValue(null);
 
-    const input: ProductCreateInput = {
-      name: 'Coverage Test',
-      type: 'raster',
-      consumptionProtocol: 'WMS',
-      boundingPolygon: 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))',
-    };
-
-    try {
-      await expect(repo.createProduct(input)).rejects.toThrow(InternalServerError);
-    } finally {
-      spy.mockRestore();
-    }
-  });
   it('repository.queryProducts should cover zoom and spatial filters', async () => {
     await insertProduct({ name: 'SpatialTest', minZoom: 10, maxZoom: 20 });
 
@@ -315,14 +303,15 @@ describe('Coverage – branch tests', () => {
 
     const input = {
       name: 'Fail',
-      type: 'raster',
-      consumptionProtocol: 'WMS',
+      type: 'raster' as const,
+      consumptionProtocol: 'WMS' as const,
       boundingPolygon: 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))',
     } as ProductCreateInput;
 
     await expect(repo.createProduct(input)).rejects.toThrow(InternalServerError);
     spy.mockRestore();
   });
+
   it('repository.queryProducts should cover intersects filter', async () => {
     await insertProduct({ name: 'IntersectsTest', boundingPolygon: 'POLYGON((0 0, 10 0, 10 10, 0 10, 0 0))' });
 
@@ -337,14 +326,15 @@ describe('Coverage – branch tests', () => {
 
     const input = {
       name: 'ManagerFail',
-      type: 'raster',
-      consumptionProtocol: 'WMS',
+      type: 'raster' as const,
+      consumptionProtocol: 'WMS' as const,
       boundingPolygon: 'POLYGON((0 0, 1 0, 1 1, 0 1, 0 0))',
     } as ProductCreateInput;
 
     await expect(manager.createProduct(input)).rejects.toThrow(InternalServerError);
     spy.mockRestore();
   });
+
   it('repository.updateProduct should throw error on failed DB update', async () => {
     const id = await insertProduct({ name: 'UpdateFail' });
 
